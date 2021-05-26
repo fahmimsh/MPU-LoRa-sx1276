@@ -4,7 +4,11 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include "FirebaseESP32.h"
+#include <stdio.h>
 
+#define FIREBASE_HOST "https://mpu-lora-default-rtdb.firebaseio.com/"
+#define FIREBASE_AUTH "M41GfzLBCrY6lqw7bXoHtaOjYBYui1l7Wkcuj94b"
 #define csPin 5
 #define resetPin 14
 #define irqPin 2
@@ -13,7 +17,10 @@ const char* ssid="fahmi";
 const char* password = "bersiapsiapya";
 
 String dataIn = "", dt[10];
+char buff[100];
 boolean parsing=false, terima = false;
+FirebaseData firebaseData;
+FirebaseJson json;
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 WiFiClient client_;
@@ -54,12 +61,34 @@ void setup() {
 //  //LoRa.setCodingRate4(8);
 //  LoRa.setSyncWord(0xE3); //0xE3
 //  //LoRa.enableCrc();   
+  connectfirebase();
 }
 
 void loop() {
-  if(runSetiap(5000)){
-    //LoRa.onReceive(onReceive);
-    //Serial.println("upload data ke firebase");
+  if(runSetiap(1000)){
+    LoRa.onReceive(onReceive);
+    String header = "/" + dt[0];
+    Firebase.setString(firebaseData, "/Node", dt[0]);
+    Firebase.setString(firebaseData,  header + "/Node", dt[0]);
+    Firebase.setString(firebaseData,  header + "/Latitude", dt[1]);
+    Firebase.setString(firebaseData,  header + "/Longlitude", dt[2]);
+    Firebase.setString(firebaseData,  header + "/Altitude", dt[3]);
+    Firebase.setString(firebaseData,  header + "/Baterai", dt[4]);
+    if (!Firebase.setString(firebaseData, "/Node", dt[0])) {
+      Serial.print("Upload data Firebase ,MPU LoRa Gagal Dengan data:");
+      Serial.println("Node tidak ada");   
+      delay(500); 
+      return;
+    }
+    Serial.println();
+    Serial.println("Upload data Firebase Berhasil");
+    Serial.print("MPU LoRa  Dengan data:");
+    Serial.print(" | Node: " + dt[0]);
+    Serial.print(" | Latitude: " + dt[1]);
+    Serial.print(" | Longlitude : " + dt[2]);
+    Serial.print(" | Altitude: " + dt[3]);
+    Serial.println(" | Baterai: " + dt[4]);
+    Serial.println("___________________________");
   }
   if (terima == true){
     parsingdata();
@@ -102,26 +131,29 @@ void onReceive(int packetSize) {
 }
 void displayoled(){
     display.clearDisplay();
-    display.setTextSize(2);
-    display.setCursor(10, 0);
-    display.println("MPU LORA");
     display.setTextSize(1);
-    display.setCursor(10, 20);
+    display.setCursor(40, 0);
+    display.print("MPU LORA");
+    display.setCursor(0, 10);
+    display.print("Node : ");
+    display.println(dt[0]);
+    display.setTextSize(1);
+    display.setCursor(0, 20);
     display.print("Latitude :");
     display.setCursor(60, 20);
     display.println(dt[1]);
 
-    display.setCursor(10, 30);
-    display.print("Longitud:");
+    display.setCursor(0, 30);
+    display.print("Longitud :");
     display.setCursor(60, 30);
     display.println(dt[2]);
 
-    display.setCursor(10, 40);
+    display.setCursor(0, 40);
     display.print("Altitude :");
     display.setCursor(60, 40);
     display.println(dt[3]);
 
-    display.setCursor(10, 50);
+    display.setCursor(0, 50);
     display.print("Battery :");
     display.setCursor(80, 50);
     display.println(dt[4] + " V");
@@ -138,6 +170,12 @@ void connectWifi() {
     Serial.println("[OK!]");
     delay(500);
     Serial.println(WiFi.localIP());  
+}
+void connectfirebase(){
+  Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+  Firebase.reconnectWiFi(true);
+  Serial.println("------------------------------------");
+  Serial.println("Connected...Firebase data MPULORA");
 }
 boolean runSetiap(unsigned long interval)
 {
